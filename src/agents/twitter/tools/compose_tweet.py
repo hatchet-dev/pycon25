@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
 from hatchet_sdk import Context
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from common.response import response_to_pydantic
 from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -46,6 +45,11 @@ class ComposeTweetResult(BaseModel):
     model: str
 
 
+class ComposeTweetResponse(BaseModel):
+    tweet: str
+    hashtags: list[str]
+
+
 @hatchet.task(name="twitter.compose-tweet", input_validator=ComposeTweetInput)
 def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
     """Generate a platform-tailored tweet/X post."""
@@ -71,43 +75,32 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
         "Return the result as a JSON object with keys `tweet` and `hashtags`."
     )
 
-    completion = client.responses.create(
+    completion = client.chat.completions.create(
         model=input.model,
         temperature=input.temperature,
         response_format={
             "type": "json_schema",
             "json_schema": {
-                "name": "ComposeTweetResponse",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "tweet": {"type": "string", "maxLength": 280},
-                        "hashtags": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                    },
-                    "required": ["tweet", "hashtags"],
-                    "additionalProperties": False,
-                },
+                "name": "compose_tweet_response",
+                "schema": ComposeTweetResponse.model_json_schema(),
             },
         },
-        input=[
+        messages=[
             {
                 "role": "system",
-                "content": [{"type": "text", "text": system_prompt}],
+                "content": system_prompt,
             },
             {
                 "role": "user",
-                "content": [{"type": "input_text", "text": user_prompt}],
+                "content": user_prompt,
             },
         ],
     )
 
-    parsed = _extract_response_json(completion)
+    parsed = response_to_pydantic(completion, ComposeTweetResponse)
 
-    tweet = parsed["tweet"].strip()
-    hashtags = [tag.strip() for tag in parsed.get("hashtags", []) if tag.strip()]
+    tweet = parsed.tweet.strip()
+    hashtags = [tag.strip() for tag in parsed.hashtags if tag.strip()]
 
     return ComposeTweetResult(
         tweet=tweet,
@@ -115,24 +108,3 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
         hashtags=hashtags,
         model=input.model,
     )
-
-
-def _extract_response_json(completion: Any) -> dict[str, Any]:
-    """Extract JSON content from the OpenAI responses API reply."""
-
-    import json
-
-    try:
-        output_text = completion.output_text
-    except AttributeError:
-        try:
-            output_text = completion.output[0].content[0].text  # type: ignore[index]
-        except (AttributeError, IndexError) as exc:  # pragma: no cover
-            raise RuntimeError(
-                "OpenAI returned an unexpected response structure."
-            ) from exc
-
-    try:
-        return cast(dict[str, Any], json.loads(output_text))
-    except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
-        raise RuntimeError("OpenAI response JSON could not be parsed.") from exc

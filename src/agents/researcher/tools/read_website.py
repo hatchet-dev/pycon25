@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 
 import requests
@@ -10,6 +9,7 @@ from hatchet_sdk import Context
 from openai import OpenAI
 from pydantic import BaseModel, Field, HttpUrl
 
+from common.response import response_to_pydantic
 from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -44,7 +44,7 @@ class ReadWebsiteInput(BaseModel):
     )
 
 
-class ReadWebsiteResult(BaseModel):
+class ReadWebsiteResultFromLLM(BaseModel):
     """Structured representation of extracted page content."""
 
     url: HttpUrl
@@ -55,6 +55,12 @@ class ReadWebsiteResult(BaseModel):
     summary: str | None = Field(
         default=None, description="Optional short summary (≤3 sentences) of the page."
     )
+
+
+class ReadWebsiteResult(ReadWebsiteResultFromLLM):
+    """Structured representation of extracted page content."""
+
+    url: HttpUrl
 
 
 @hatchet.task(name="researcher.read-website", input_validator=ReadWebsiteInput)
@@ -94,55 +100,36 @@ def read_website(input: ReadWebsiteInput, ctx: Context) -> ReadWebsiteResult:
         f"{prepared_html}"
     )
 
-    ai_response = client.responses.create(
+    ai_response = client.chat.completions.create(
         model=input.model,
         temperature=input.temperature,
         response_format={
             "type": "json_schema",
             "json_schema": {
-                "name": "ReadWebsiteResult",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "string"},
-                        "content_markdown": {"type": "string"},
-                        "summary": {"type": ["string", "null"]},
-                    },
-                    "required": ["title", "content_markdown"],
-                    "additionalProperties": False,
-                },
+                "name": "ReadWebsiteResultFromLLM",
+                "schema": ReadWebsiteResultFromLLM.model_json_schema(),
             },
         },
-        input=[
+        messages=[
             {
                 "role": "system",
-                "content": [{"type": "text", "text": system_instruction}],
+                "content": system_instruction,
             },
             {
                 "role": "user",
-                "content": [{"type": "input_text", "text": user_prompt}],
+                "content": user_prompt,
             },
         ],
     )
 
-    output_text = getattr(ai_response, "output_text", None)
-    if not output_text:
-        try:
-            output_text = ai_response.output[0].content[0].text  # type: ignore[index]
-        except (
-            AttributeError,
-            IndexError,
-        ) as exc:  # pragma: no cover - defensive fallback
-            raise RuntimeError(
-                "OpenAI returned an unexpected response structure."
-            ) from exc
+    parsed = response_to_pydantic(ai_response, ReadWebsiteResultFromLLM)
 
-    try:
-        parsed_payload = json.loads(output_text)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("OpenAI response was not valid JSON.") from exc
-
-    return ReadWebsiteResult(url=input.url, **parsed_payload)
+    return ReadWebsiteResult(
+        url=input.url,
+        title=parsed.title,
+        content_markdown=parsed.content_markdown,
+        summary=parsed.summary,
+    )
 
 
 def _prepare_html(raw_html: str, max_characters: int) -> str:

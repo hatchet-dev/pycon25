@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from hatchet_sdk import Context
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from common.response import response_to_pydantic
 from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -39,6 +38,11 @@ class JudgeTweetResult(BaseModel):
     model: str
 
 
+class JudgeTweetResponse(BaseModel):
+    should_publish: bool
+    feedback: str
+
+
 @hatchet.task(name="twitter.judge-tweet", input_validator=JudgeTweetInput)
 def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
     """Judge whether a tweet is ready to publish and provide feedback if not."""
@@ -59,40 +63,32 @@ def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
         "focused on how to improve the tweet."
     )
 
-    completion = client.responses.create(
+    completion = client.chat.completions.create(
         model=input.model,
         temperature=input.temperature,
-        text={
+        response_format={
             "type": "json_schema",
             "json_schema": {
-                "name": "JudgeTweetResponse",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "should_publish": {"type": "boolean"},
-                        "feedback": {"type": "string", "maxLength": 500},
-                    },
-                    "required": ["should_publish", "feedback"],
-                    "additionalProperties": False,
-                },
+                "name": "judge_tweet_response",
+                "schema": JudgeTweetResponse.model_json_schema(),
             },
         },
-        input=[
+        messages=[
             {
                 "role": "system",
-                "content": [{"type": "text", "text": system_prompt}],
+                "content": system_prompt,
             },
             {
                 "role": "user",
-                "content": [{"type": "input_text", "text": user_prompt}],
+                "content": user_prompt,
             },
         ],
     )
 
-    parsed = _extract_response_json(completion)
+    parsed = response_to_pydantic(completion, JudgeTweetResponse)
 
-    should_publish = bool(parsed.get("should_publish", False))
-    feedback = parsed.get("feedback", "").strip()
+    should_publish = parsed.should_publish
+    feedback = parsed.feedback
 
     if should_publish:
         feedback = ""
@@ -104,24 +100,3 @@ def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
         feedback=feedback,
         model=input.model,
     )
-
-
-def _extract_response_json(completion: Any) -> dict[str, Any]:
-    """Extract JSON content from the OpenAI responses API reply."""
-
-    import json
-
-    try:
-        output_text = completion.output_text
-    except AttributeError:
-        try:
-            output_text = completion.output[0].content[0].text  # type: ignore[index]
-        except (AttributeError, IndexError) as exc:  # pragma: no cover
-            raise RuntimeError(
-                "OpenAI returned an unexpected response structure."
-            ) from exc
-
-    try:
-        return json.loads(output_text)
-    except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
-        raise RuntimeError("OpenAI response JSON could not be parsed.") from exc

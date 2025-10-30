@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
 from hatchet_sdk import Context
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from common.response import response_to_pydantic
 from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -55,6 +54,13 @@ class CreatePostResult(BaseModel):
     temperature: float
 
 
+class CreateLinkedInPostResponse(BaseModel):
+    headline: str
+    body: str
+    cta: str
+    hashtags: list[str]
+
+
 @hatchet.task(name="linkedin.create-post", input_validator=CreatePostInput)
 def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResult:
     """Generate copy for a LinkedIn post.
@@ -93,60 +99,40 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResu
         "Return a JSON object with keys `headline`, `body`, `cta`, and `hashtags` (array)."
     )
 
-    completion = client.responses.create(
+    completion = client.chat.completions.create(
         model=input.model,
         temperature=float(input.temperature),
         response_format={
             "type": "json_schema",
             "json_schema": {
-                "name": "CreateLinkedInPostResponse",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "headline": {"type": "string", "maxLength": 120},
-                        "body": {"type": "string"},
-                        "cta": {"type": "string"},
-                        "hashtags": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                    },
-                    "required": ["headline", "body", "cta", "hashtags"],
-                    "additionalProperties": False,
-                },
+                "name": "create_linkedin_post_response",
+                "schema": CreateLinkedInPostResponse.model_json_schema(),
             },
         },
-        input=[
+        messages=[
             {
                 "role": "system",
-                "content": [{"type": "text", "text": system_instruction}],
+                "content": system_instruction,
             },
             {
                 "role": "user",
-                "content": [{"type": "input_text", "text": user_prompt}],
+                "content": user_prompt,
             },
         ],
     )
 
-    parsed_payload = _extract_response_json(completion)
+    parsed_payload = response_to_pydantic(completion, CreateLinkedInPostResponse)
 
     if not input.include_hashtags:
-        parsed_payload["hashtags"] = []
+        parsed_payload.hashtags = []
 
-    composed_post = _compose_linkedin_post(
-        parsed_payload["headline"],
-        parsed_payload["body"],
-        parsed_payload["cta"],
-        parsed_payload.get("hashtags", []),
-    )
+    composed_post = _compose_linkedin_post(parsed_payload)
 
     return CreatePostResult(
-        headline=parsed_payload["headline"].strip(),
-        body=parsed_payload["body"].strip(),
-        cta=parsed_payload["cta"].strip(),
-        hashtags=[
-            tag.strip() for tag in parsed_payload.get("hashtags", []) if tag.strip()
-        ],
+        headline=parsed_payload.headline.strip(),
+        body=parsed_payload.body.strip(),
+        cta=parsed_payload.cta.strip(),
+        hashtags=[tag.strip() for tag in parsed_payload.hashtags if tag.strip()],
         post=composed_post,
         tone=input.tone,
         audience=input.audience,
@@ -155,36 +141,13 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResu
     )
 
 
-def _compose_linkedin_post(
-    headline: str, body: str, cta: str, hashtags: list[str]
-) -> str:
+def _compose_linkedin_post(post: CreateLinkedInPostResponse) -> str:
     """Assemble the final LinkedIn post string from structured components."""
 
-    sections = [headline.strip(), "", body.strip(), "", cta.strip()]
+    sections = [post.headline.strip(), "", post.body.strip(), "", post.cta.strip()]
 
-    if hashtags:
+    if post.hashtags:
         sections.append("")
-        sections.append(" ".join(hashtags))
+        sections.append(" ".join(post.hashtags))
 
     return "\n".join(section for section in sections if section)
-
-
-def _extract_response_json(completion: Any) -> dict[str, Any]:
-    """Extract JSON content from the OpenAI responses API reply."""
-
-    import json
-
-    try:
-        output_text = completion.output_text
-    except AttributeError:
-        try:
-            output_text = completion.output[0].content[0].text  # type: ignore[index]
-        except (AttributeError, IndexError) as exc:  # pragma: no cover
-            raise RuntimeError(
-                "OpenAI returned an unexpected response structure."
-            ) from exc
-
-    try:
-        return cast(dict[str, Any], json.loads(output_text))
-    except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
-        raise RuntimeError("OpenAI response JSON could not be parsed.") from exc
