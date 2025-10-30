@@ -1,11 +1,7 @@
-"""Hatchet task for generating a LinkedIn-ready post with the OpenAI SDK."""
-
-from __future__ import annotations
-
 from hatchet_sdk import Context
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from common.dependencies import OpenAIDependency
 from common.response import response_to_pydantic
 from hatchet_client import hatchet
 
@@ -13,8 +9,6 @@ DEFAULT_MODEL = "gpt-4o-mini"
 
 
 class CreatePostInput(BaseModel):
-    """Validated payload for the ``create_linkedin_post`` task."""
-
     prompt: str = Field(..., description="Core idea or instructions for the post.")
     tone: str = Field(
         default="professional",
@@ -41,8 +35,6 @@ class CreatePostInput(BaseModel):
 
 
 class CreatePostResult(BaseModel):
-    """Structured response returned by ``create_linkedin_post``."""
-
     headline: str
     body: str
     cta: str
@@ -61,31 +53,22 @@ class CreateLinkedInPostResponse(BaseModel):
     hashtags: list[str]
 
 
+SYSTEM_PROMPT = (
+    "You are an executive LinkedIn content strategist. Write thoughtful posts that open "
+    "with a bold headline, deliver actionable insight in two short paragraphs, and close "
+    "with a motivating call to action addressing the specified audience. Maintain a "
+    "professional yet personable voice and weave in concrete details where possible."
+)
+
+
 @hatchet.task(name="linkedin.create-post", input_validator=CreatePostInput)
-def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResult:
-    """Generate copy for a LinkedIn post.
-
-    Expected ``input`` keys:
-        - ``prompt``: core idea or instructions for the post (required)
-        - ``tone``: desired tone, e.g. "professional", "casual" (optional)
-        - ``audience``: target audience description (optional)
-        - ``model``: OpenAI chat completion model override (optional)
-        - ``temperature``: sampling temperature override (optional)
-    """
-
-    client = OpenAI()
-
+async def create_linkedin_post(
+    input: CreatePostInput, _ctx: Context, openai: OpenAIDependency
+) -> CreatePostResult:
     hashtag_guidance = (
         "Include a final line with 1-3 relevant hashtags tailored to LinkedIn readers."
         if input.include_hashtags
         else "Do not include hashtags in the final post."
-    )
-
-    system_instruction = (
-        "You are an executive LinkedIn content strategist. Write thoughtful posts that open "
-        "with a bold headline, deliver actionable insight in two short paragraphs, and close "
-        "with a motivating call to action addressing the specified audience. Maintain a "
-        "professional yet personable voice and weave in concrete details where possible."
     )
 
     user_prompt = (
@@ -99,7 +82,7 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResu
         "Return a JSON object with keys `headline`, `body`, `cta`, and `hashtags` (array)."
     )
 
-    completion = client.chat.completions.create(
+    completion = await openai.chat.completions.create(
         model=input.model,
         temperature=float(input.temperature),
         response_format={
@@ -112,7 +95,7 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResu
         messages=[
             {
                 "role": "system",
-                "content": system_instruction,
+                "content": SYSTEM_PROMPT,
             },
             {
                 "role": "user",
@@ -142,8 +125,6 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResu
 
 
 def _compose_linkedin_post(post: CreateLinkedInPostResponse) -> str:
-    """Assemble the final LinkedIn post string from structured components."""
-
     sections = [post.headline.strip(), "", post.body.strip(), "", post.cta.strip()]
 
     if post.hashtags:
