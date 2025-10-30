@@ -1,10 +1,14 @@
 import asyncio
 
-from agents.researcher.tools.read_website import read_website
+from agents.twitter.twitter_agent import TwitterAgentInput, twitter_agent
 
 
 async def main() -> None:
-    result = await read_website.aio_run()
+    result = await twitter_agent.aio_run(
+        input=TwitterAgentInput(
+            message="Post something fun about our PyCon workshop for the world to see!"
+        )
+    )
     print(result)  # noqa: T201
 
 

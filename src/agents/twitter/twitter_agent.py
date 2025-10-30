@@ -20,6 +20,9 @@ class TwitterAgentOutput(BaseModel):
     tweet: str
     hashtags: list[str]
 
+    def __repr__(self) -> str:
+        return f"Tweet: {self.tweet}\nHashtags: {' '.join(self.hashtags)}"
+
 
 @hatchet.durable_task(name="twitter.twitter_agent", input_validator=TwitterAgentInput)
 async def twitter_agent(

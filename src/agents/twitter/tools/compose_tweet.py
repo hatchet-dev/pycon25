@@ -1,9 +1,15 @@
-from hatchet_sdk import Context
+from hatchet_sdk import ConcurrencyExpression, ConcurrencyLimitStrategy, Context
 from pydantic import BaseModel, Field
 
 from common.dependencies import OpenAIDependency
 from common.llm import generate
 from hatchet_client import hatchet
+
+ConcurrencyExpression(
+    expression="'constant'",
+    max_runs=1,
+    limit_strategy=ConcurrencyLimitStrategy.GROUP_ROUND_ROBIN,
+)
 
 SYSTEM_PROMPT = (
     "You are an expert Twitter/X copywriter. You craft concise posts that stay within "
