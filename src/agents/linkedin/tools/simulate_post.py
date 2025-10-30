@@ -38,7 +38,7 @@ class SimulationResult(BaseModel):
     }
 
 
-@hatchet.task(name="linkedin.simulate-post")
+@hatchet.task(name="linkedin.simulate-post", input_validator=SimulatePostInput)
 def simulate_linkedin_post(input: SimulatePostInput, ctx: Context) -> dict[str, Any]:
     """Simulate sending a LinkedIn post to downstream systems.
 

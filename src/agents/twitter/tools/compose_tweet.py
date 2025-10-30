@@ -8,7 +8,7 @@ from hatchet_sdk import Context
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from src.hatchet_client import hatchet
+from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -46,7 +46,7 @@ class ComposeTweetResult(BaseModel):
     model: str
 
 
-@hatchet.task(name="twitter.compose-tweet")
+@hatchet.task(name="twitter.compose-tweet", input_validator=ComposeTweetInput)
 def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
     """Generate a platform-tailored tweet/X post."""
 

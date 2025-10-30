@@ -10,7 +10,7 @@ from hatchet_sdk import Context
 from openai import OpenAI
 from pydantic import BaseModel, Field, HttpUrl
 
-from src.hatchet_client import hatchet
+from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_MAX_CHARACTERS = 20_000

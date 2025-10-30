@@ -1,6 +1,6 @@
 import asyncio
 
-from src.agents.researcher.tools.read_website import read_website
+from agents.researcher.tools.read_website import read_website
 
 
 async def main() -> None:

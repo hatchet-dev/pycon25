@@ -1,7 +1,7 @@
-import src.agents.linkedin.tools as linkedin_tools
-import src.agents.twitter.tools as twitter_tools
-from src.agents.researcher.tools.read_website import read_website
-from src.hatchet_client import hatchet
+import agents.linkedin.tools as linkedin_tools
+import agents.twitter.tools as twitter_tools
+from agents.researcher.tools.read_website import read_website
+from hatchet_client import hatchet
 
 
 def main() -> None:

@@ -8,7 +8,7 @@ from hatchet_sdk import Context
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from src.hatchet_client import hatchet
+from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -39,7 +39,7 @@ class JudgeTweetResult(BaseModel):
     model: str
 
 
-@hatchet.task(name="twitter.judge-tweet")
+@hatchet.task(name="twitter.judge-tweet", input_validator=JudgeTweetInput)
 def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
     """Judge whether a tweet is ready to publish and provide feedback if not."""
 
