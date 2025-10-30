@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from hatchet_sdk import Context
 from openai import OpenAI
@@ -55,8 +55,8 @@ class CreatePostResult(BaseModel):
     temperature: float
 
 
-@hatchet.task(name="linkedin.create-post")
-def create_linkedin_post(input: CreatePostInput, ctx: Context) -> dict[str, Any]:
+@hatchet.task(name="linkedin.create-post", input_validator=CreatePostInput)
+def create_linkedin_post(input: CreatePostInput, ctx: Context) -> CreatePostResult:
     """Generate copy for a LinkedIn post.
 
     Expected ``input`` keys:
@@ -140,7 +140,7 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> dict[str, Any]
         parsed_payload.get("hashtags", []),
     )
 
-    result = CreatePostResult(
+    return CreatePostResult(
         headline=parsed_payload["headline"].strip(),
         body=parsed_payload["body"].strip(),
         cta=parsed_payload["cta"].strip(),
@@ -153,12 +153,6 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> dict[str, Any]
         model=input.model,
         temperature=float(input.temperature),
     )
-
-    ctx.log(
-        f"Generated LinkedIn post with headline `{result.headline}` using model `{input.model}`."
-    )
-
-    return result.model_dump()
 
 
 def _compose_linkedin_post(
@@ -191,6 +185,6 @@ def _extract_response_json(completion: Any) -> dict[str, Any]:
             ) from exc
 
     try:
-        return json.loads(output_text)
+        return cast(dict[str, Any], json.loads(output_text))
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
         raise RuntimeError("OpenAI response JSON could not be parsed.") from exc

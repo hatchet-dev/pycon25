@@ -142,13 +142,7 @@ def read_website(input: ReadWebsiteInput, ctx: Context) -> ReadWebsiteResult:
     except json.JSONDecodeError as exc:
         raise RuntimeError("OpenAI response was not valid JSON.") from exc
 
-    result = ReadWebsiteResult(url=input.url, **parsed_payload)
-
-    ctx.log(
-        f"Extracted content from `{input.url}` titled `{result.title}` using model `{input.model}`."
-    )
-
-    return result.model_dump()
+    return ReadWebsiteResult(url=input.url, **parsed_payload)
 
 
 def _prepare_html(raw_html: str, max_characters: int) -> str:

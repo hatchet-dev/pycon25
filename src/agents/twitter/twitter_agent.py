@@ -14,7 +14,7 @@ from hatchet_client import hatchet
 
 
 class TwitterAgentInput(BaseModel):
-    message: str | None = None
+    message: str
     researcher_result: ReadWebsiteResult | None = None
 
 
@@ -23,8 +23,10 @@ class TwitterAgentOutput(BaseModel):
     hashtags: list[str]
 
 
-@hatchet.durable_task(name="twitter.twitter_agent")
-async def twitter_agent(input: TwitterAgentInput, ctx: DurableContext) -> None:
+@hatchet.durable_task(name="twitter.twitter_agent", input_validator=TwitterAgentInput)
+async def twitter_agent(
+    input: TwitterAgentInput, ctx: DurableContext
+) -> TwitterAgentOutput | None:
     ctx.log(f"Twitter agent received input: {input}")
 
     for _ in range(3):

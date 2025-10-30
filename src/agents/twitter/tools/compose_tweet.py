@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from hatchet_sdk import Context
 from openai import OpenAI
@@ -109,18 +109,12 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
     tweet = parsed["tweet"].strip()
     hashtags = [tag.strip() for tag in parsed.get("hashtags", []) if tag.strip()]
 
-    result = ComposeTweetResult(
+    return ComposeTweetResult(
         tweet=tweet,
         tone=input.tone,
         hashtags=hashtags,
         model=input.model,
     )
-
-    ctx.log(
-        f"Generated tweet with {len(tweet)} characters using model `{input.model}`."
-    )
-
-    return result.model_dump()
 
 
 def _extract_response_json(completion: Any) -> dict[str, Any]:
@@ -139,6 +133,6 @@ def _extract_response_json(completion: Any) -> dict[str, Any]:
             ) from exc
 
     try:
-        return json.loads(output_text)
+        return cast(dict[str, Any], json.loads(output_text))
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
         raise RuntimeError("OpenAI response JSON could not be parsed.") from exc

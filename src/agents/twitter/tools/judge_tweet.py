@@ -62,7 +62,7 @@ def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
     completion = client.responses.create(
         model=input.model,
         temperature=input.temperature,
-        response_format={
+        text={
             "type": "json_schema",
             "json_schema": {
                 "name": "JudgeTweetResponse",
@@ -99,15 +99,11 @@ def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
     elif not feedback:
         feedback = "Revise the tweet to improve clarity, tone, or engagement before publishing."
 
-    result = JudgeTweetResult(
+    return JudgeTweetResult(
         should_publish=should_publish,
         feedback=feedback,
         model=input.model,
     )
-
-    ctx.log(f"Tweet judged as {should_publish} using model `{input.model}`.")
-
-    return result.model_dump()
 
 
 def _extract_response_json(completion: Any) -> dict[str, Any]:

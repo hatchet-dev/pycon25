@@ -39,7 +39,7 @@ class SimulationResult(BaseModel):
 
 
 @hatchet.task(name="linkedin.simulate-post", input_validator=SimulatePostInput)
-def simulate_linkedin_post(input: SimulatePostInput, ctx: Context) -> dict[str, Any]:
+def simulate_linkedin_post(input: SimulatePostInput, ctx: Context) -> SimulationResult:
     """Simulate sending a LinkedIn post to downstream systems.
 
     Expected ``input`` keys:
@@ -73,13 +73,9 @@ def simulate_linkedin_post(input: SimulatePostInput, ctx: Context) -> dict[str, 
         else:
             scheduled_time = schedule_value.astimezone(timezone.utc)
 
-    result = SimulationResult(
+    return SimulationResult(
         post=post_content,
         scheduled_time=scheduled_time,
         channel=channel,
         status="simulated",
     )
-
-    ctx.log(f"Simulated posting for channel `{channel}` at `{result.scheduled_time}`.")
-
-    return result.model_dump(mode="json")
