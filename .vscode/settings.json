@@ -1,3 +1,6 @@
 {
-  "cSpell.words": ["basicrag", "genai"]
+  "cSpell.words": ["basicrag", "genai"],
+  "python-envs.defaultEnvManager": "ms-python.python:poetry",
+  "python-envs.defaultPackageManager": "ms-python.python:poetry",
+  "python-envs.pythonProjects": []
 }

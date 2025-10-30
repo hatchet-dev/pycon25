@@ -33,7 +33,7 @@ profile = "black"
 
 
 [tool.mypy]
-files = ["."]
+files = ["src"]
 strict = true
 enable_error_code = [
     "possibly-undefined",

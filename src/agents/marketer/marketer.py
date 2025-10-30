@@ -1,9 +1,9 @@
 from hatchet_sdk import Context
 from pydantic import BaseModel
 
-from agents.researcher.tools.read_website import read_website
-from agents.twitter.tools.compose_tweet import ComposeTweetInput
 from hatchet_client import hatchet
+from src.agents.researcher.tools.read_website import read_website
+from src.agents.twitter.tools.compose_tweet import ComposeTweetInput
 
 
 class MarketerInput(BaseModel):
