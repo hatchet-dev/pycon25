@@ -1,20 +1,19 @@
-"""Hatchet task for evaluating Twitter/X posts for publish readiness."""
-
-from __future__ import annotations
-
 from hatchet_sdk import Context
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from common.dependencies import OpenAIDependency
 from common.response import response_to_pydantic
 from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
+SYSTEM_PROMPT = (
+    "You are a meticulous social media editor specializing in Twitter/X. "
+    "Assess the provided tweet for publish readiness, considering clarity, engagement, "
+    "brand safety, length limits, and tone."
+)
 
 
 class JudgeTweetInput(BaseModel):
-    """Validated payload for the ``judge_tweet`` task."""
-
     tweet: str = Field(
         ..., description="Tweet text that needs to be evaluated before publishing."
     )
@@ -31,8 +30,6 @@ class JudgeTweetInput(BaseModel):
 
 
 class JudgeTweetResult(BaseModel):
-    """Structured response from the ``judge_tweet`` task."""
-
     should_publish: bool
     feedback: str
     model: str
@@ -44,17 +41,9 @@ class JudgeTweetResponse(BaseModel):
 
 
 @hatchet.task(name="twitter.judge-tweet", input_validator=JudgeTweetInput)
-def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
-    """Judge whether a tweet is ready to publish and provide feedback if not."""
-
-    client = OpenAI()
-
-    system_prompt = (
-        "You are a meticulous social media editor specializing in Twitter/X. "
-        "Assess the provided tweet for publish readiness, considering clarity, engagement, "
-        "brand safety, length limits, and tone."
-    )
-
+async def judge_tweet(
+    input: JudgeTweetInput, ctx: Context, openai: OpenAIDependency
+) -> JudgeTweetResult:
     user_prompt = (
         "Review the following tweet and decide if it should be published as-is.\n\n"
         f"Tweet:\n{input.tweet}\n\n"
@@ -63,7 +52,7 @@ def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
         "focused on how to improve the tweet."
     )
 
-    completion = client.chat.completions.create(
+    completion = await openai.chat.completions.create(
         model=input.model,
         temperature=input.temperature,
         response_format={
@@ -76,7 +65,7 @@ def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
         messages=[
             {
                 "role": "system",
-                "content": system_prompt,
+                "content": SYSTEM_PROMPT,
             },
             {
                 "role": "user",

@@ -1,15 +1,16 @@
-"""Hatchet task for crafting platform-appropriate Twitter/X posts."""
-
-from __future__ import annotations
-
 from hatchet_sdk import Context
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from common.dependencies import OpenAIDependency
 from common.response import response_to_pydantic
 from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
+SYSTEM_PROMPT = (
+    "You are an expert Twitter/X copywriter. You craft concise posts that stay within "
+    "the 280-character limit, use strong hooks, and match the specified tone. Keep the "
+    "language conversational, avoid excessive emojis, and ensure any line breaks are purposeful."
+)
 
 
 class ComposeTweetInput(BaseModel):
@@ -61,21 +62,17 @@ class ComposeTweetResponse(BaseModel):
 
 
 @hatchet.task(name="twitter.compose-tweet", input_validator=ComposeTweetInput)
-def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
+async def compose_tweet(
+    input: ComposeTweetInput,
+    _ctx: Context,
+    openai: OpenAIDependency,
+) -> ComposeTweetResult:
     """Generate a platform-tailored tweet/X post."""
-
-    client = OpenAI()
 
     hashtag_instruction = (
         "Include up to three relevant hashtags separated by spaces at the end of the tweet."
         if input.include_hashtags
         else "Do not include hashtags."
-    )
-
-    system_prompt = (
-        "You are an expert Twitter/X copywriter. You craft concise posts that stay within "
-        "the 280-character limit, use strong hooks, and match the specified tone. Keep the "
-        "language conversational, avoid excessive emojis, and ensure any line breaks are purposeful."
     )
 
     user_prompt = (
@@ -87,7 +84,7 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
         f"The last iteration of the tweet was: {input.previous_tweet}"
     )
 
-    completion = client.chat.completions.create(
+    completion = await openai.chat.completions.create(
         model=input.model,
         temperature=input.temperature,
         response_format={
@@ -100,7 +97,7 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
         messages=[
             {
                 "role": "system",
-                "content": system_prompt,
+                "content": SYSTEM_PROMPT,
             },
             {
                 "role": "user",
@@ -111,12 +108,9 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
 
     parsed = response_to_pydantic(completion, ComposeTweetResponse)
 
-    tweet = parsed.tweet.strip()
-    hashtags = [tag.strip() for tag in parsed.hashtags if tag.strip()]
-
     return ComposeTweetResult(
-        tweet=tweet,
+        tweet=parsed.tweet.strip(),
         tone=input.tone,
-        hashtags=hashtags,
+        hashtags=[tag.strip() for tag in parsed.hashtags if tag.strip()],
         model=input.model,
     )
