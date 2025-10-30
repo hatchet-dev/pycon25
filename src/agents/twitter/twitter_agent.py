@@ -1,7 +1,6 @@
 from hatchet_sdk import DurableContext
 from pydantic import BaseModel
 
-from agents.researcher.tools.read_website import ReadWebsiteResult
 from agents.twitter.tools.compose_tweet import (
     ComposeTweetInput,
     compose_tweet,
@@ -15,7 +14,6 @@ from hatchet_client import hatchet
 
 class TwitterAgentInput(BaseModel):
     message: str
-    researcher_result: ReadWebsiteResult | None = None
 
 
 class TwitterAgentOutput(BaseModel):
@@ -35,18 +33,12 @@ async def twitter_agent(
         tweet = await compose_tweet.aio_run(
             input=ComposeTweetInput(
                 prompt=input.message,
-                tone="punchy",
-                include_hashtags=True,
-                model="gpt-4o-mini",
-                temperature=0.8,
                 previous_feedback=previous_feedback,
                 previous_tweet=previous_tweet,
             )
         )
         judge_tweet_result = await judge_tweet.aio_run(
-            input=JudgeTweetInput(
-                tweet=tweet.tweet, model="gpt-4o-mini", temperature=0.2
-            )
+            input=JudgeTweetInput(tweet=tweet.tweet)
         )
 
         previous_feedback = judge_tweet_result.feedback

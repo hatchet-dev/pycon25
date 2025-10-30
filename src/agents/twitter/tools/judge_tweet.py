@@ -2,10 +2,9 @@ from hatchet_sdk import Context
 from pydantic import BaseModel, Field
 
 from common.dependencies import OpenAIDependency
-from common.response import response_to_pydantic
+from common.llm import generate
 from hatchet_client import hatchet
 
-DEFAULT_MODEL = "gpt-4o-mini"
 SYSTEM_PROMPT = (
     "You are a meticulous social media editor specializing in Twitter/X. "
     "Assess the provided tweet for publish readiness, considering clarity, engagement, "
@@ -17,22 +16,6 @@ class JudgeTweetInput(BaseModel):
     tweet: str = Field(
         ..., description="Tweet text that needs to be evaluated before publishing."
     )
-    model: str = Field(
-        default=DEFAULT_MODEL,
-        description="OpenAI chat completion model to use for judgment.",
-    )
-    temperature: float = Field(
-        default=0.2,
-        ge=0,
-        le=2,
-        description="Sampling temperature for the model when generating feedback.",
-    )
-
-
-class JudgeTweetResult(BaseModel):
-    should_publish: bool
-    feedback: str
-    model: str
 
 
 class JudgeTweetResponse(BaseModel):
@@ -42,8 +25,8 @@ class JudgeTweetResponse(BaseModel):
 
 @hatchet.task(name="twitter.judge-tweet", input_validator=JudgeTweetInput)
 async def judge_tweet(
-    input: JudgeTweetInput, ctx: Context, openai: OpenAIDependency
-) -> JudgeTweetResult:
+    input: JudgeTweetInput, _ctx: Context, openai: OpenAIDependency
+) -> JudgeTweetResponse:
     user_prompt = (
         "Review the following tweet and decide if it should be published as-is.\n\n"
         f"Tweet:\n{input.tweet}\n\n"
@@ -52,40 +35,9 @@ async def judge_tweet(
         "focused on how to improve the tweet."
     )
 
-    completion = await openai.chat.completions.create(
-        model=input.model,
-        temperature=input.temperature,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "judge_tweet_response",
-                "schema": JudgeTweetResponse.model_json_schema(),
-            },
-        },
-        messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
-        ],
-    )
-
-    parsed = response_to_pydantic(completion, JudgeTweetResponse)
-
-    should_publish = parsed.should_publish
-    feedback = parsed.feedback
-
-    if should_publish:
-        feedback = ""
-    elif not feedback:
-        feedback = "Revise the tweet to improve clarity, tone, or engagement before publishing."
-
-    return JudgeTweetResult(
-        should_publish=should_publish,
-        feedback=feedback,
-        model=input.model,
+    return await generate(
+        openai=openai,
+        response_model=JudgeTweetResponse,
+        system_prompt=SYSTEM_PROMPT,
+        user_prompt=user_prompt,
     )

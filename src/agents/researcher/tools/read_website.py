@@ -1,24 +1,17 @@
-"""Hatchet task for fetching and extracting readable content from a web page."""
-
-from __future__ import annotations
-
 import re
 
-import requests
+import aiohttp
 from hatchet_sdk import Context
-from openai import OpenAI
 from pydantic import BaseModel, Field, HttpUrl
 
-from common.response import response_to_pydantic
+from common.dependencies import OpenAIDependency
+from common.llm import generate
 from hatchet_client import hatchet
 
-DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_MAX_CHARACTERS = 20_000
 
 
 class ReadWebsiteInput(BaseModel):
-    """Validated payload for the ``read_website`` task."""
-
     url: HttpUrl = Field(..., description="URL of the web page to retrieve.")
     timeout_seconds: float = Field(
         default=15.0,
@@ -26,16 +19,7 @@ class ReadWebsiteInput(BaseModel):
         le=60.0,
         description="Timeout for the HTTP request in seconds.",
     )
-    model: str = Field(
-        default=DEFAULT_MODEL,
-        description="OpenAI Responses model used to extract readable content.",
-    )
-    temperature: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=2.0,
-        description="Temperature passed to the OpenAI model.",
-    )
+
     max_characters: int = Field(
         default=DEFAULT_MAX_CHARACTERS,
         ge=1_000,
@@ -45,8 +29,6 @@ class ReadWebsiteInput(BaseModel):
 
 
 class ReadWebsiteResultFromLLM(BaseModel):
-    """Structured representation of extracted page content."""
-
     url: HttpUrl
     title: str
     content_markdown: str = Field(
@@ -58,33 +40,28 @@ class ReadWebsiteResultFromLLM(BaseModel):
 
 
 class ReadWebsiteResult(ReadWebsiteResultFromLLM):
-    """Structured representation of extracted page content."""
-
     url: HttpUrl
 
 
 @hatchet.task(name="researcher.read-website", input_validator=ReadWebsiteInput)
-def read_website(input: ReadWebsiteInput, ctx: Context) -> ReadWebsiteResult:
-    """Fetch a web page and ask OpenAI to extract readable Markdown content."""
-
+async def read_website(
+    input: ReadWebsiteInput, ctx: Context, openai: OpenAIDependency
+) -> ReadWebsiteResult:
     ctx.log(
         f"Fetching URL `{input.url}` with timeout `{input.timeout_seconds}` seconds "
-        f"and model `{input.model}`."
     )
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url=input.url.unicode_string()) as response,
+    ):
+        if response.status != 200:
+            raise RuntimeError(
+                f"Request to `{input.url}` failed with status code {response.status}."
+            )
 
-    try:
-        response = requests.get(str(input.url), timeout=input.timeout_seconds)
-    except requests.RequestException as exc:  # pragma: no cover - network failures
-        raise RuntimeError(f"Failed to fetch `{input.url}`: {exc}") from exc
+        text = await response.text()
 
-    if response.status_code >= 400:
-        raise RuntimeError(
-            f"Request to `{input.url}` failed with status code {response.status_code}."
-        )
-
-    prepared_html = _prepare_html(response.text, input.max_characters)
-
-    client = OpenAI()
+        prepared_html = _prepare_html(text, input.max_characters)
 
     system_instruction = (
         "You are an expert research assistant that extracts the main readable content from "
@@ -100,41 +77,22 @@ def read_website(input: ReadWebsiteInput, ctx: Context) -> ReadWebsiteResult:
         f"{prepared_html}"
     )
 
-    ai_response = client.chat.completions.create(
-        model=input.model,
-        temperature=input.temperature,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "ReadWebsiteResultFromLLM",
-                "schema": ReadWebsiteResultFromLLM.model_json_schema(),
-            },
-        },
-        messages=[
-            {
-                "role": "system",
-                "content": system_instruction,
-            },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
-        ],
+    completion = await generate(
+        openai=openai,
+        response_model=ReadWebsiteResultFromLLM,
+        system_prompt=system_instruction,
+        user_prompt=user_prompt,
     )
-
-    parsed = response_to_pydantic(ai_response, ReadWebsiteResultFromLLM)
 
     return ReadWebsiteResult(
         url=input.url,
-        title=parsed.title,
-        content_markdown=parsed.content_markdown,
-        summary=parsed.summary,
+        title=completion.title,
+        content_markdown=completion.content_markdown,
+        summary=completion.summary,
     )
 
 
 def _prepare_html(raw_html: str, max_characters: int) -> str:
-    """Strip scripts/styles and truncate HTML before sending it to the model."""
-
     without_scripts = re.sub(
         r"<script.*?>.*?</script>", "", raw_html, flags=re.DOTALL | re.IGNORECASE
     )
