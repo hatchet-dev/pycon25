@@ -14,6 +14,12 @@ pydantic = "^2.9.2"
 requests = "^2.32.3"
 
 
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.18.2"
+ruff = "^0.14.2"
+isort = "^7.0.0"
+black = "^25.9.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -21,3 +27,81 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 simple = "src.run:main"
 worker = "src.worker:main"
+
+[tool.isort]
+profile = "black"
+
+
+[tool.mypy]
+files = ["."]
+strict = true
+enable_error_code = [
+    "possibly-undefined",
+    "truthy-bool",
+    "redundant-expr",
+    "truthy-iterable",
+]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # pycodestyle errors
+    "E",
+    # pycodestyle warnings
+    "W",
+    # isort
+    "I",
+    # pep8-naming
+    "N",
+    # pyupgrade (modern Python idioms)
+    "UP",
+    # flake8-async (async/await)
+    "ASYNC",
+    # flake8-bugbear (likely bugs)
+    "B",
+    # flake8-simplify (code simplification)
+    "SIM",
+    # flake8-comprehensions (list/dict comprehensions)
+    "C4",
+    # flake8-pie (misc improvements)
+    "PIE",
+    # flake8-return (return statement improvements)
+    "RET",
+    # flake8-unused-arguments
+    "ARG",
+    # flake8-logging-format
+    "G",
+    # Ruff-specific rules
+    "RUF",
+    # Datetime (timezone) rules
+    "DTZ",
+    "FIX",
+    ## Performance-related rules
+    "PERF",
+
+    # Print statements
+    "T201",
+]
+
+ignore = [
+    # Allow long lines
+    "E501",
+    # Allow complex variable names
+    "N806",
+    # Don't enforce specific exception types initially
+    "B008",
+    # Allow unused function arguments
+    "ARG001",
+    "ARG002",
+    # Allow empty returns
+    "RET503",
+
+    ## FIXME (ironic) - re-enable this later
+    "FIX",
+
+    "RET506",
+]

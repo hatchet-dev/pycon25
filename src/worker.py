@@ -1,17 +1,20 @@
-from hatchet_client import hatchet
-from agents.researcher.tools.read_website import read_website
-import agents.linkedin.tools as linkedin_tools
-import agents.twitter.tools as twitter_tools
+import src.agents.linkedin.tools as linkedin_tools
+import src.agents.twitter.tools as twitter_tools
+from src.agents.researcher.tools.read_website import read_website
+from src.hatchet_client import hatchet
 
 
 def main() -> None:
     worker = hatchet.worker(
-        "test-worker", slots=1, workflows=[
+        "test-worker",
+        slots=1,
+        workflows=[
             read_website,
             linkedin_tools.create_linkedin_post,
             linkedin_tools.simulate_linkedin_post,
             twitter_tools.compose_tweet,
-        ])
+        ],
+    )
     worker.start()
 
 

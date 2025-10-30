@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from hatchet_sdk import Context
-from hatchet_client import hatchet
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+from src.hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -105,10 +105,7 @@ def judge_tweet(input: JudgeTweetInput, ctx: Context) -> JudgeTweetResult:
         model=input.model,
     )
 
-    ctx.log(
-        "Tweet judged as %s using model `%s`."
-        % ("ready to publish" if should_publish else "needs revisions", input.model)
-    )
+    ctx.log(f"Tweet judged as {should_publish} using model `{input.model}`.")
 
     return result.model_dump()
 
@@ -124,11 +121,11 @@ def _extract_response_json(completion: Any) -> dict[str, Any]:
         try:
             output_text = completion.output[0].content[0].text  # type: ignore[index]
         except (AttributeError, IndexError) as exc:  # pragma: no cover
-            raise RuntimeError("OpenAI returned an unexpected response structure.") from exc
+            raise RuntimeError(
+                "OpenAI returned an unexpected response structure."
+            ) from exc
 
     try:
         return json.loads(output_text)
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
         raise RuntimeError("OpenAI response JSON could not be parsed.") from exc
-
-

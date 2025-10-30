@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
 
 import requests
 from hatchet_sdk import Context
 from openai import OpenAI
-
-from hatchet_client import hatchet
-
 from pydantic import BaseModel, Field, HttpUrl
 
+from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_MAX_CHARACTERS = 20_000
@@ -52,7 +49,9 @@ class ReadWebsiteResult(BaseModel):
 
     url: HttpUrl
     title: str
-    content_markdown: str = Field(description="Primary page content converted to Markdown.")
+    content_markdown: str = Field(
+        description="Primary page content converted to Markdown."
+    )
     summary: str | None = Field(
         default=None, description="Optional short summary (≤3 sentences) of the page."
     )
@@ -130,8 +129,13 @@ def read_website(input: ReadWebsiteInput, ctx: Context) -> ReadWebsiteResult:
     if not output_text:
         try:
             output_text = ai_response.output[0].content[0].text  # type: ignore[index]
-        except (AttributeError, IndexError) as exc:  # pragma: no cover - defensive fallback
-            raise RuntimeError("OpenAI returned an unexpected response structure.") from exc
+        except (
+            AttributeError,
+            IndexError,
+        ) as exc:  # pragma: no cover - defensive fallback
+            raise RuntimeError(
+                "OpenAI returned an unexpected response structure."
+            ) from exc
 
     try:
         parsed_payload = json.loads(output_text)
@@ -162,5 +166,3 @@ def _prepare_html(raw_html: str, max_characters: int) -> str:
         return condensed[:max_characters]
 
     return condensed
-
-

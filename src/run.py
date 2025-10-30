@@ -1,11 +1,11 @@
 import asyncio
 
-from agents.researcher.tools.read_website import read_website
+from src.agents.researcher.tools.read_website import read_website
 
 
 async def main() -> None:
     result = await read_website.aio_run()
-    print(result)
+    print(result)  # noqa: T201
 
 
 if __name__ == "__main__":

@@ -5,13 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from hatchet_sdk import Context
-
-from hatchet_client import hatchet
-
 from openai import OpenAI
-
 from pydantic import BaseModel, Field
 
+from hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -147,7 +144,9 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> dict[str, Any]
         headline=parsed_payload["headline"].strip(),
         body=parsed_payload["body"].strip(),
         cta=parsed_payload["cta"].strip(),
-        hashtags=[tag.strip() for tag in parsed_payload.get("hashtags", []) if tag.strip()],
+        hashtags=[
+            tag.strip() for tag in parsed_payload.get("hashtags", []) if tag.strip()
+        ],
         post=composed_post,
         tone=input.tone,
         audience=input.audience,
@@ -156,8 +155,7 @@ def create_linkedin_post(input: CreatePostInput, ctx: Context) -> dict[str, Any]
     )
 
     ctx.log(
-        "Generated LinkedIn post with headline `%s` using model `%s`."
-        % (result.headline, input.model)
+        f"Generated LinkedIn post with headline `{result.headline}` using model `{input.model}`."
     )
 
     return result.model_dump()
@@ -188,11 +186,11 @@ def _extract_response_json(completion: Any) -> dict[str, Any]:
         try:
             output_text = completion.output[0].content[0].text  # type: ignore[index]
         except (AttributeError, IndexError) as exc:  # pragma: no cover
-            raise RuntimeError("OpenAI returned an unexpected response structure.") from exc
+            raise RuntimeError(
+                "OpenAI returned an unexpected response structure."
+            ) from exc
 
     try:
         return json.loads(output_text)
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
         raise RuntimeError("OpenAI response JSON could not be parsed.") from exc
-
-

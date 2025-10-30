@@ -1,14 +1,12 @@
-"""Hatchet task for simulating the posting of LinkedIn content."""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from hatchet_sdk import Context
+from pydantic import BaseModel, Field
 
 from hatchet_client import hatchet
-
-from pydantic import BaseModel, Field
 
 
 class SimulatePostInput(BaseModel):
@@ -57,8 +55,12 @@ def simulate_linkedin_post(input: SimulatePostInput, ctx: Context) -> dict[str, 
     if isinstance(schedule_input, str):
         try:
             schedule_value = datetime.fromisoformat(schedule_input)
-        except ValueError as exc:  # pragma: no cover - bubble up invalid formats clearly
-            raise ValueError("`schedule` must be a valid ISO8601 datetime string.") from exc
+        except (
+            ValueError
+        ) as exc:  # pragma: no cover - bubble up invalid formats clearly
+            raise ValueError(
+                "`schedule` must be a valid ISO8601 datetime string."
+            ) from exc
     else:
         schedule_value = schedule_input
 
@@ -77,10 +79,6 @@ def simulate_linkedin_post(input: SimulatePostInput, ctx: Context) -> dict[str, 
         status="simulated",
     )
 
-    ctx.log(
-        "Simulated posting for channel `%s` at `%s`." % (channel, result.scheduled_time)
-    )
+    ctx.log(f"Simulated posting for channel `{channel}` at `{result.scheduled_time}`.")
 
     return result.model_dump(mode="json")
-
-

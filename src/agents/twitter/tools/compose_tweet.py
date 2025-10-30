@@ -5,13 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from hatchet_sdk import Context
-
-from hatchet_client import hatchet
-
 from openai import OpenAI
-
 from pydantic import BaseModel, Field
 
+from src.hatchet_client import hatchet
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -19,9 +16,7 @@ DEFAULT_MODEL = "gpt-4o-mini"
 class ComposeTweetInput(BaseModel):
     """Validated payload for the ``compose_tweet`` task."""
 
-    prompt: str = Field(
-        ..., description="Core idea or instructions for the tweet."  # noqa: E501
-    )
+    prompt: str = Field(..., description="Core idea or instructions for the tweet.")
     tone: str = Field(
         default="punchy",
         description="Desired tone, e.g. punchy, witty, informative.",
@@ -122,8 +117,7 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
     )
 
     ctx.log(
-        "Generated tweet with %d characters using model `%s`."
-        % (len(tweet), input.model)
+        f"Generated tweet with {len(tweet)} characters using model `{input.model}`."
     )
 
     return result.model_dump()
@@ -140,11 +134,11 @@ def _extract_response_json(completion: Any) -> dict[str, Any]:
         try:
             output_text = completion.output[0].content[0].text  # type: ignore[index]
         except (AttributeError, IndexError) as exc:  # pragma: no cover
-            raise RuntimeError("OpenAI returned an unexpected response structure.") from exc
+            raise RuntimeError(
+                "OpenAI returned an unexpected response structure."
+            ) from exc
 
     try:
         return json.loads(output_text)
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive parsing
         raise RuntimeError("OpenAI response JSON could not be parsed.") from exc
-
-
