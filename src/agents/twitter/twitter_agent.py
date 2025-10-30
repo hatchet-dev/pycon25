@@ -28,6 +28,8 @@ async def twitter_agent(
     input: TwitterAgentInput, ctx: DurableContext
 ) -> TwitterAgentOutput | None:
     ctx.log(f"Twitter agent received input: {input}")
+    previous_tweet: str | None = None
+    previous_feedback: str | None = None
 
     for _ in range(3):
         tweet = await compose_tweet.aio_run(
@@ -37,6 +39,8 @@ async def twitter_agent(
                 include_hashtags=True,
                 model="gpt-4o-mini",
                 temperature=0.8,
+                previous_feedback=previous_feedback,
+                previous_tweet=previous_tweet,
             )
         )
         judge_tweet_result = await judge_tweet.aio_run(
@@ -44,6 +48,10 @@ async def twitter_agent(
                 tweet=tweet.tweet, model="gpt-4o-mini", temperature=0.2
             )
         )
+
+        previous_feedback = judge_tweet_result.feedback
+        previous_tweet = tweet.tweet
+
         if judge_tweet_result.should_publish:
             # await ctx.aio_wait_for("tweet:approved", )
 

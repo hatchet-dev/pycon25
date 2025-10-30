@@ -1,6 +1,7 @@
 import agents.linkedin.tools as linkedin_tools
-import agents.twitter.tools as twitter_tools
 from agents.researcher.tools.read_website import read_website
+from agents.twitter.tools import compose_tweet, judge_tweet
+from agents.twitter.twitter_agent import twitter_agent
 from hatchet_client import hatchet
 
 
@@ -11,7 +12,9 @@ def main() -> None:
             read_website,
             linkedin_tools.create_linkedin_post,
             linkedin_tools.simulate_linkedin_post,
-            twitter_tools.compose_tweet,
+            compose_tweet,
+            judge_tweet,
+            twitter_agent,
         ],
     )
     worker.start()

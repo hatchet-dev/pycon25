@@ -35,6 +35,16 @@ class ComposeTweetInput(BaseModel):
         description="Sampling temperature for the model.",
     )
 
+    previous_feedback: str | None = Field(
+        default=None,
+        description="Optional feedback from prior tweet evaluations to improve upon.",
+    )
+
+    previous_tweet: str | None = Field(
+        default=None,
+        description="Optional prior tweet text to revise based on feedback.",
+    )
+
 
 class ComposeTweetResult(BaseModel):
     """Structured response from the ``compose_tweet`` task."""
@@ -72,7 +82,9 @@ def compose_tweet(input: ComposeTweetInput, ctx: Context) -> ComposeTweetResult:
         f"Compose a tweet/X post about: {input.prompt}\n"
         f"Tone: {input.tone}\n"
         f"Requirements: {hashtag_instruction}\n"
-        "Return the result as a JSON object with keys `tweet` and `hashtags`."
+        "Return the result as a JSON object with keys `tweet` and `hashtags`.\n"
+        f"You've previously received the following feedback on the last iteration of the tweet: {input.previous_feedback}\n"
+        f"The last iteration of the tweet was: {input.previous_tweet}"
     )
 
     completion = client.chat.completions.create(
