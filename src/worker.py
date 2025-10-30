@@ -6,8 +6,7 @@ from hatchet_client import hatchet
 
 def main() -> None:
     worker = hatchet.worker(
-        "test-worker",
-        slots=1,
+        "agent-worker",
         workflows=[
             read_website,
             linkedin_tools.create_linkedin_post,
