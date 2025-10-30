@@ -57,7 +57,7 @@ class ReadWebsiteResult(BaseModel):
     )
 
 
-@hatchet.task(name="researcher.read-website")
+@hatchet.task(name="researcher.read-website", input_validator=ReadWebsiteInput)
 def read_website(input: ReadWebsiteInput, ctx: Context) -> ReadWebsiteResult:
     """Fetch a web page and ask OpenAI to extract readable Markdown content."""
 

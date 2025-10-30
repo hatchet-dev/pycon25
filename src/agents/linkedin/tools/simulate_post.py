@@ -51,6 +51,7 @@ def simulate_linkedin_post(input: SimulatePostInput, ctx: Context) -> dict[str, 
     post_content = input.post
     channel = input.channel
     schedule_input = input.schedule
+    schedule_value: datetime | None = None
 
     if isinstance(schedule_input, str):
         try:

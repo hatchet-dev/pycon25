@@ -30,7 +30,7 @@ async def twitter_agent(input: TwitterAgentInput, ctx: DurableContext) -> None:
     for _ in range(3):
         tweet = await compose_tweet.aio_run(
             input=ComposeTweetInput(
-                message=input.message,
+                prompt=input.message,
                 tone="punchy",
                 include_hashtags=True,
                 model="gpt-4o-mini",
